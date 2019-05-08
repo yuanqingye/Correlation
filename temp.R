@@ -14,69 +14,20 @@ jinqiao_shop_correlation_melt_ordered_trunk = get_ordered_correlation_table(jinq
 write.csv(jinqiao_brand_correlation_melt_ordered_trunk,"~/data/jinqiao_brand_correlation_melt.csv")
 write.csv(jinqiao_shop_correlation_melt_ordered_trunk,"~/data/jinqiao_shop_correlation_melt.csv")
 
-get_ordered_correlation_table = function(data,N = 11){
-  temp = as.data.frame(data)
-  temp = as.data.table(temp)
-  temp$id = rownames(data)
-  melt_result = melt.data.table(temp,id.vars = "id",measure.vars = 1:(ncol(temp)-1))
-  order_result = melt_result[order(id,value,decreasing = TRUE),]
-  trunk_result = order_result[,.SD[2:N,],by = "id"]
-  return(trunk_result)
-}
-
-cal_correlation_edited = function(data,user_col,mat_col){
-  #data = fetch(res)
-  data = data[nchar(str_trim(data[[user_col]]))!=0 & !is.na(data[[user_col]]) & !is.null(data[[user_col]]),]
-  if(mat_col == "mobile"){
-  data = data[mobile != "/" & mobile != "//" & mobile != "-" & !str_detect(mobile,"^12|^11|^1$") & mobile != "" & mobile != "",]}
-  data = data[data[[mat_col]]!="",]
-  user = unique(data[[user_col]]) 
-  mat = unique(data[[mat_col]])
-  uidx = match(data[[user_col]], user)
-  midx = match(data[[mat_col]], mat)
-  M = matrix(0, length(user), length(mat))
-  i = cbind(uidx, midx)
-  dti = data.table(i)
-  colnames(dti) = c("uidx","midx")
-  stat_dti = dti[,.(freq = .N),by = c("uidx","midx")]
-  matrix_i = as.matrix(stat_dti[,c("uidx","midx")])
-  M[matrix_i]= stat_dti$freq #this step can be modified
-  mod = colSums(M^2)^0.5      
-  MM = M %*% diag(1/mod)      
-  S = crossprod(MM)
-  rownames(S) = mat
-  colnames(S) = mat
-  return(S)
-}
-
-cal_correlation = function(data,user_col,mat_col){
-  #data = fetch(res)
-  user = unique(data[[user_col]]) 
-  mat = unique(data[[mat_col]])
-  uidx = match(data[[user_col]], user)
-  midx = match(data[[mat_col]], mat)
-  M = matrix(0, length(user), length(mat))
-  i = cbind(uidx, mid)
-  M[i]=1   
-  mod = colSums(M^2)^0.5    
-  MM = M %*% diag(1/mod)    
-  S = crossprod(MM)     
-}
 
 # jinqiao_trace_data_sql =  ""
 # jinqiao_trace_data = read_data_impala_general(jinqiao_trace_data_sql)
 
 load("~/R_Projects/sale_model_standard/smart_mall_track_data_list_second.RData")
-load("~/R_Projects/sale_model_standard/smart_mall_list.RData")
-
+load("~/R_Projects/sale_model_standard/smart_mall_list.RData", verbose = TRUE)
 smart_mall_track_data_jan = rbindlist(smart_mall_track_data_list)
 smart_mall_track_data_feb = rbindlist(smart_mall_list)
-
+smart_mall_track_data_apr = rbindlist(smart_mall_list)
 smart_mall_track_data = rbind(smart_mall_track_data_jan,smart_mall_track_data_feb)
 rm(smart_mall_track_data_jan,smart_mall_track_data_feb)
 
-smart_mall_track_data = smart_mall_track_data[event_type == 1,]
-smart_mall_track_data$time_interval = difftime(smart_mall_track_data$exit_time,smart_mall_track_data$enter_time)
+smart_mall_track_data = smart_mall_track_data[event_type == 0,]
+# smart_mall_track_data$time_interval = difftime(smart_mall_track_data$exit_time,smart_mall_track_data$enter_time)
 smart_mall_track_data$time_duration = difftime(smart_mall_track_data$exit_time,smart_mall_track_data$enter_time,units = "mins")
 smart_mall_track_data_oneday_atime = smart_mall_track_data[time_duration>2,.(freq = .N),by = c("rsprofileid","store_name","dt")]
 smart_mall_track_data_oneday_atime = smart_mall_track_data[,.(freq = .N),by = c("rsprofileid","store_name","dt")]
@@ -99,9 +50,27 @@ jinqiao_shop_track_correlation_melt_ordered_trunk = get_ordered_correlation_tabl
 jinqiao_brand_track_correlation = cal_correlation_edited(smart_mall_track_data_with_brand_oneday_atime,"rsprofileid","cont_main_brand_name")
 jinqiao_brand_track_correlation_melt_ordered_trunk = get_ordered_correlation_table(jinqiao_brand_track_correlation,21)
 
-write.csv(jinqiao_shop_track_correlation_melt_ordered_trunk,"~/data/jinqiao_shop_track_correlation_melt_2min.csv")
-write.csv(jinqiao_brand_track_correlation_melt_ordered_trunk,"~/data/jinqiao_brand_track_correlation_melt_2min.csv")
 write.csv(jinqiao_shop_track_correlation_melt_ordered_trunk,"~/data/jinqiao_shop_track_correlation_melt.csv")
 write.csv(jinqiao_brand_track_correlation_melt_ordered_trunk,"~/data/jinqiao_brand_track_correlation_melt.csv")
+write.csv(jinqiao_shop_track_correlation_melt_ordered_trunk,"~/data/jinqiao_shop_track_correlation_melt_2min.csv")
+write.csv(jinqiao_brand_track_correlation_melt_ordered_trunk,"~/data/jinqiao_brand_track_correlation_melt_2min.csv")
 write.csv(jinqiao_shop_track_correlation_melt_ordered_trunk,"~/data/jinqiao_shop_track_correlation_melt_15day_2min.csv")
 write.csv(jinqiao_brand_track_correlation_melt_ordered_trunk,"~/data/jinqiao_brand_track_correlation_melt_15day_2min.csv")
+
+ptm = proc.time()
+temp1 = strptime(smart_mall_track_data$exit_time,"%Y-%m-%d %H:%M:%S")
+intv = proc.time() - ptm
+
+library(lubridate)
+ptm = proc.time()
+temp1 = ymd_hms(smart_mall_track_data$exit_time)
+temp0 = ymd_hms(smart_mall_track_data$enter_time)
+intv = proc.time() - ptm
+temp = difftime(temp1,temp0,units = "min")
+temp = temp1 - temp0
+
+starttime = ymd_hms(paste(dat[,1], dat[,2]))
+endtime = ymd_hms(paste(dat[,3], dat[,4]))
+interval = difftime(endtime,starttime,units = "secs")
+
+difftime(paste(dat[,3], dat[,4]),paste(dat[,1], dat[,2]),units = "secs")
